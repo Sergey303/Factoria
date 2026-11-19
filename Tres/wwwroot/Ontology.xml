@@ -1,5 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <!--
+  Онтология Ontology_iis-v15.xml Изменения 20250811:
+  - Повысил уровень объекта для uri до sys-obj
   Онтология Ontology_iis-v14.xml Изменения 20230902:
   - Убрал reg-phone-code и прилегающие
   - Убрал post-address и прилегающие свойства

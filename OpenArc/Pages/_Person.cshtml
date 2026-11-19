@@ -1,0 +1,25 @@
+﻿@page
+@using Factograph.Data
+@using Factograph.Data.r
+
+@* @model Rec *@
+@{
+	//Rec? tree = @Model;
+	//string? name = tree?.GetText("http://fogid.net/o/name");
+	string name = "Hi-Hi!";
+}
+
+@* @if (tree != null) *@ 
+@{
+	<p class="grad">
+		<a href="Default.cshtml" class="nov"><img src="img/ico-home.gif" class="ico-home" alt="" />Открытый архив</a>
+		&raquo;
+		Персоны
+		&raquo;
+		@name
+	</p>
+
+
+}
+
+

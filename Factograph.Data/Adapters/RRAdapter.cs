@@ -155,7 +155,7 @@ namespace Factograph.Data.Adapters
                     .SelectMany(f =>
                     {
                         string line = (string)f[1];
-                        var words = line.ToLower()
+                        var words = line.ToUpper()
                             .Split(delimeters, StringSplitOptions.RemoveEmptyEntries);
                         return words.Select(w =>
                         {
@@ -166,7 +166,7 @@ namespace Factograph.Data.Adapters
                             }
                             return wrd;
                         });
-                    }).ToArray();
+                    }).Distinct().ToArray();
                 return query;
             };
             svwords = new UVecIndex(GenStream2, records, toWords,
@@ -258,14 +258,25 @@ namespace Factograph.Data.Adapters
 
         public IEnumerable<object> SearchName(string searchstring)
         {
+            //if (searchstring == "п")
+            //{
+            //    var gal = records.GetAllByLike(0, searchstring)
+            //    .Select(r => ConvertNaming(r))
+            //    .Where(r => r != null)
+            //    .Distinct<object>(rSame)
+            //    .ToArray();
+            //}
             var qu1 = records.GetAllByLike(0, searchstring)
                 .Select(r => ConvertNaming(r))
+                .Where(r => r != null)
                 .Distinct<object>(rSame);
             return qu1;
         }
         // Используется для решения отношения naming
-        private object ConvertNaming(object oo)
+        private object ConvertNaming(object ob)
         {
+            object oo = ob;
+
             string tp = (string)((object[])oo)[1];
             if (tp == "http://fogid.net/o/naming")
             {
@@ -299,12 +310,39 @@ namespace Factograph.Data.Adapters
                 .Select(gr => new { key = gr.Key, c = gr.Count(), o = gr.First() })
                 .OrderByDescending(tri => tri.c)
                 //.Take(20)
-                //.ToArray()
+                .ToArray()
                 ;
             var query = qqq.Select(tri => tri.o.obj)
                 .Distinct<object>(rSame);
             return query;
         }
+        // Поиск по словам с выдачей кортежа word, count, rect
+        public override IEnumerable<Tuple<string, int, object>> SearchWordsWCR(string line)
+        {
+            string[] wrds = line.ToUpper().Split(delimeters);
+            var qqq = wrds.SelectMany(w =>
+            {
+                string wrd = w;
+                if (Normalize != null)
+                {
+                    wrd = Normalize(w);
+                }
+                var qu = records.GetAllByValue(1, wrd, toWords, true).Select(r => new { obj = r, wrd = wrd })
+                    .ToArray();
+                return qu;
+            })
+                .GroupBy(ow => (string)((object[])ow.obj)[0])
+                .Select(gr => new { key = gr.Key, c = gr.Count(), o = gr.First() })
+                .OrderByDescending(tri => tri.c)
+                //.Take(20)
+                .Select(tri => new Tuple<string, int, object>(tri.o.wrd, tri.c, tri.o.obj))
+                .ToArray()
+                ;
+            //var query = qqq.Select(tri => tri.o.obj)
+            //    .Distinct<object>(rSame);
+            return qqq;
+        }
+
         public override object? GetRecord(string id)
         {
             var qu = records.GetByKey(id);

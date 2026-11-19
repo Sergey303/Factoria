@@ -154,7 +154,7 @@ namespace Factograph.Data.Adapters
                     .SelectMany(f =>
                     {
                         string line = (string)f[1];
-                        var words = line.ToLower()
+                        var words = line.ToUpper()
                             .Split(delimeters, StringSplitOptions.RemoveEmptyEntries);
                         return words.Select(w =>
                         {
@@ -165,7 +165,7 @@ namespace Factograph.Data.Adapters
                             }
                             return wrd;
                         });
-                    }).ToArray();
+                    }).Distinct().ToArray();
                 return query;
             };
             svwords = new UVecIndex(GenStream2, records, toWords,
@@ -601,6 +601,11 @@ namespace Factograph.Data.Adapters
                 return xres;
             }));
             xall.Save(filename);
+        }
+
+        public override IEnumerable<Tuple<string, int, object>> SearchWordsWCR(string searchwords)
+        {
+            throw new NotImplementedException();
         }
 
         private class DirectPropComparer : IEqualityComparer<object>

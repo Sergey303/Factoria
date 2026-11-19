@@ -3,10 +3,24 @@
 <div>
     <input @bind="searchstring" style="height:24px; margin-top:10px;margin-bottom:10px;" />
     <select @bind="stype" style="height: 24px; margin-top: 10px; margin-bottom: 10px; ">
-        <option value=""></option>
-        @foreach (var typ in typs.Where(t => db.ontology.LabelOfOnto(t) != null)) //TODO: Надо бы более корректно...
-        {
-            <option value="@typ">@(db.ontology.LabelOfOnto(typ))</option>
+        @{
+            int ind = 0;
+            foreach (var typ in typs) //TODO: Надо бы более корректно...
+            {
+                string label = "";
+                if (typ == "" || (label = db.ontology.LabelOfOnto(typ)) != null)
+                {
+                    if (ind == 0)
+                    {
+                        <option selected value="@typ">@(label)</option>
+                    }
+                    else
+                    {
+                        <option value="@typ">@(label)</option>
+                    }
+                }
+                ind++;
+            }
         }
     </select>
     <span>расш.<input type="checkbox" @bind="bywords" /></span>
@@ -15,7 +29,9 @@
 
 @if (!string.IsNullOrEmpty(searchstring))
 {
-    foreach (var rec in db.SearchRRecords(searchstring, bywords))
+    if (stype == null && typs.Length > 0 && !string.IsNullOrEmpty(typs[0])) { stype = typs[0]; }
+    var sresults = db.SearchRRecords(searchstring, bywords).ToArray();
+    foreach (var rec in sresults)
     {
         string tp = rec.Tp;
         if (stype != null && stype != tp) { continue; }

@@ -73,6 +73,8 @@ namespace Factograph.Data
         }
         private string configfilename = "config.xml";
         private Dictionary<string, string> toNormalForm = new Dictionary<string, string>();
+        private bool bigdictionary = false; // Чтобы оптимизировать словарь, когда он становится большим 
+        private HashSet<string> usedwords = new HashSet<string>(); // использованные слова
         public void Init()
         {
             // Создание словаря если есть файл zaliznyak_shortform.zip
@@ -83,8 +85,10 @@ namespace Factograph.Data
                 bool zipped = dictionary.EndsWith(".zip") ? true : false;
                 if (zipped)
                 {
+                    if (File.Exists(path + "zaliznyak_shortform.txt")) { File.Delete(path + "zaliznyak_shortform.txt"); }
+
                     System.IO.Compression.ZipFile.ExtractToDirectory(dictionary, path);
-                    shortname = shortname.Substring(0, dictionary.Length - 4) + ".txt";
+                    shortname = shortname.Substring(0, shortname.Length - 4) + ".txt";
                 }
                 var reader = new StreamReader(path + shortname);
                 toNormalForm = new Dictionary<string, string>();
@@ -92,11 +96,12 @@ namespace Factograph.Data
                 string? normal = null;
                 while ((line = reader.ReadLine()) != null)
                 {
+                    line = line.ToUpper();
                     string[] parts = line.Split(' ');
                     normal = parts[0];
-                    foreach (string w in parts)
+                    foreach (string ww in parts)
                     {
-                        if (!toNormalForm.ContainsKey(w)) toNormalForm.Add(w, normal);
+                        if (!toNormalForm.ContainsKey(ww)) toNormalForm.Add(ww, normal);
                     }
                 }
                 reader.Close();
@@ -173,7 +178,7 @@ namespace Factograph.Data
                 else if (pre == "uni") Load(); // Всегда загружать!
                 else if (pre == "upi")
                 {
-                    if (directreload || nodatabase) //Load
+                    if (true || directreload || nodatabase) //Load
                     {
                         Load();
                         // Надо сохранить точку записи, это делается в конце загрузки.
@@ -869,7 +874,24 @@ namespace Factograph.Data
                     null);
 
             }
-            fi.fogx.Add(nitem);
+            // Добавление nitem в фог-документ
+            // Коррекция delete в старую сторону (rdf:about -> id) //TODO Надо будет убрать!!! 
+            if (nitem.Name.LocalName == "delete")
+            {
+                XAttribute? att_id = nitem.Attribute("{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about");
+                if (att_id != null)
+                {
+                    XElement nitem1 = new XElement(nitem);
+                    var attributes = nitem1.Attributes().ToArray();
+                    nitem1.RemoveAttributes();
+                    nitem1.Add(new XAttribute("id", att_id.Value));
+                    nitem1.Add(attributes.Where(a => a.Name.LocalName != "about"));
+
+                    fi.fogx.Add(nitem1);
+                }
+                else fi.fogx.Add(nitem);
+            }
+            else fi.fogx.Add(nitem);
 
             // Сохраняем файл
             fi.fogx.Save(fi.pth);
@@ -920,6 +942,11 @@ namespace Factograph.Data
         public DAdapter GetAdapter()
         {
             return adapter;
+        }
+
+        public IEnumerable<Tuple<string, int, object>> SearchWordsWCR(string line)
+        {
+            return adapter.SearchWordsWCR(line);
         }
     }
 }
