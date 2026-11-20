@@ -476,7 +476,12 @@ namespace Factograph.Data.Adapters
             }
             else if (record.Name.LocalName == "substitute")
             {
-                return null;
+                // Substitution changes both the old identity and every incoming reference.
+                // Silently accepting it leaves the database inconsistent. RRAdapter has no
+                // atomic multi-record rewrite/recovery protocol for this operation yet.
+                throw new NotSupportedException(
+                    "RRAdapter cannot apply substitute incrementally. " +
+                    "Rebuild the index from the Fog source containing the substitute directive.");
             }
             else
             {
