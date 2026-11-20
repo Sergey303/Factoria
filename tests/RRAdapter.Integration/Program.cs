@@ -142,6 +142,30 @@ try
     Check(adapter.GetItemByIdBasic("alice", false) is null, "reopen deleted record");
     Check(!HasResult(adapter.SearchByWords("BLUEBERRY"), "alice"), "reopen deleted word index");
     adapter.Close();
+
+    // Full Fog rebuild supplies resolved substitution mappings. RRAdapter must
+    // rewrite incoming rdf:resource links before constructing inverse indexes.
+    adapter = Open();
+    adapter.StartFillDb(_ => { });
+    adapter.LoadXFlow(new[] {
+        Item("alice", "Alice", "Linked to old identity", "old-bob"),
+        Item("bob", "Bob", "Current target")
+    }, new Dictionary<string, string> {
+        ["old-bob"] = "bob",
+        ["deleted-id"] = null!
+    });
+    adapter.FinishFillDb(_ => { });
+    Check(adapter.GetInverseRecords("bob").Any(),
+        "substitute rebuild redirects inverse links to replacement");
+    Check(!adapter.GetInverseRecords("old-bob").Any(),
+        "substitute rebuild removes obsolete inverse links");
+    adapter.Close();
+    adapter = Open();
+    Check(adapter.GetInverseRecords("bob").Any(),
+        "substitute redirect survives reopen");
+    Check(!adapter.GetInverseRecords("old-bob").Any(),
+        "obsolete inverse link stays absent after reopen");
+    adapter.Close();
     Console.WriteLine("ALL INTEGRATION CHECKS PASSED");
 }
 finally
