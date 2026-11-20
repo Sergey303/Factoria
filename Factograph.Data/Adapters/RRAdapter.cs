@@ -105,9 +105,11 @@ namespace Factograph.Data.Adapters
             // Создаем последовательность записей
             records = new USequence(tp_rec, dbfolder + "state.bin", GenStream2,
                 rec => (string)((object[])rec)[1] == "delete", // признак уничтоженности
-                rec => (string)((object[])rec)[0], // как брать ключ
-                kval => (int)Hashfunctions.HashRot13((string)kval), // как делать хеш от ключа
                 true);
+            // Keep the existing persisted primary-key hash algorithm for legacy databases.
+            records.SetPrimaryKey<string>(
+                rec => (string)((object[])rec)[0],
+                key => unchecked((int)Hashfunctions.HashRot13(key)));
             records.Refresh();
 
             GC.Collect();
