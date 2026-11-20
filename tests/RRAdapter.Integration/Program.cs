@@ -1,6 +1,18 @@
 using Factograph.Data.Adapters;
 using System.Xml.Linq;
 
+if (args.Length == 2 && args[0] == "stage3-all")
+{
+    Stage3Runner.RunAll(int.Parse(args[1]));
+    return;
+}
+
+if (args.Length > 0 && args[0].StartsWith("stage3-", StringComparison.Ordinal))
+{
+    Stage3Scenarios.Run(args);
+    return;
+}
+
 const string ontology = "http://fogid.net/o/";
 const string rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 
