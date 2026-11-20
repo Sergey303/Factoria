@@ -464,6 +464,16 @@ namespace Factograph.Data.Adapters
 
         public override XElement? PutItem(XElement record)
         {
+            ArgumentNullException.ThrowIfNull(record);
+            if (record.Name.LocalName == "substitute")
+            {
+                // A substitute directive redirects all incoming references, not just its
+                // subject. This adapter cannot publish that multi-record change atomically.
+                throw new NotSupportedException(
+                    "RRAdapter cannot apply substitute incrementally. " +
+                    "Rebuild the index from the Fog source containing the substitute directive.");
+            }
+
             // Какой элемент изменяется?
             string? id = record.Attribute("{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about")?.Value;
             if (id == null) throw new ArgumentNullException("id"); // return null;
@@ -473,15 +483,6 @@ namespace Factograph.Data.Adapters
             if (record.Name.LocalName == "delete")
             {
                 nrec = new object[] { id, "delete", new object[0] };
-            }
-            else if (record.Name.LocalName == "substitute")
-            {
-                // Substitution changes both the old identity and every incoming reference.
-                // Silently accepting it leaves the database inconsistent. RRAdapter has no
-                // atomic multi-record rewrite/recovery protocol for this operation yet.
-                throw new NotSupportedException(
-                    "RRAdapter cannot apply substitute incrementally. " +
-                    "Rebuild the index from the Fog source containing the substitute directive.");
             }
             else
             {
