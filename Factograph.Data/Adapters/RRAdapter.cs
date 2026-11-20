@@ -110,8 +110,6 @@ namespace Factograph.Data.Adapters
             records.SetPrimaryKey<string>(
                 rec => (string)((object[])rec)[0],
                 key => unchecked((int)Hashfunctions.HashRot13(key)));
-            records.Refresh();
-
             GC.Collect();
 
             // ====== Добавим дополнительные индексы 
@@ -129,7 +127,6 @@ namespace Factograph.Data.Adapters
             };
 
             var names_ind = new SVectorIndex(GenStream2, records, skey);
-            names_ind.Refresh();
 
 
             // Компаратор
@@ -173,7 +170,6 @@ namespace Factograph.Data.Adapters
             };
             svwords = new UVecIndex(GenStream2, records, toWords,
                 v => Hashfunctions.HashRot13((string)v), true);
-            svwords.Refresh();
 
             // Обратный индекс состоит из множества пар { predicate, resource } PredResourcePair (см. в конце),
             // Там же функция GetPredResourcePairs, преобразующая запись в поток пар. Пары будут 
@@ -197,7 +193,6 @@ namespace Factograph.Data.Adapters
             };
             //inverse_index = new SVectorIndex(GenStream2, records, ext_keys, false);
             inverse_index = new UVecIndex(GenStream2, records, ext_keys, v => Hashfunctions.HashRot13((string)v));
-            inverse_index.Refresh();
 
             records.uindexes = new IUIndex[]
             {
@@ -205,6 +200,9 @@ namespace Factograph.Data.Adapters
                 svwords,  // Для поиска по словам
                 inverse_index  // Обратный индекс
             };
+
+            // Restore the sequence together with its secondary indexes, including the append tail.
+            records.Refresh();
 
             GC.Collect();
             Console.WriteLine($"==={DateTime.Now}===After Init === Total Memory: " + GC.GetTotalMemory(true));
