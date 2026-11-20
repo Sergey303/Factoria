@@ -103,6 +103,19 @@ try
         substituteRejected = true;
     }
     Check(substituteRejected, "substitute explicitly rejected instead of silently ignored");
+    bool canonicalSubstituteRejected = false;
+    try
+    {
+        adapter.PutItem(new XElement(XName.Get("substitute", "http://fogid.net/u/"),
+            new XAttribute(XName.Get("about", rdf), "alice"),
+            new XElement(XName.Get("newid", "http://fogid.net/u/"),
+                new XAttribute(XName.Get("resource", rdf), "bob"))));
+    }
+    catch (NotSupportedException)
+    {
+        canonicalSubstituteRejected = true;
+    }
+    Check(canonicalSubstituteRejected, "canonical substitute explicitly rejected");
     Check(adapter.GetItemByIdBasic("alice", false)?.ToString() == oldAlice,
         "rejected substitute does not change existing resource");
     Check(HasResult(adapter.SearchByName("Ali"), "alice"),
