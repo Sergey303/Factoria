@@ -90,6 +90,25 @@ try
     Check(HasResult(adapter.SearchByName("Ali"), "alice"), "reopen name prefix");
     Check(HasResult(adapter.SearchByWords("ORCHARD"), "alice"), "reopen word index");
     Check(adapter.GetInverseRecords("bob").Any(), "reopen inverse index");
+    var oldAlice = adapter.GetItemByIdBasic("alice", false)?.ToString();
+    bool substituteRejected = false;
+    try
+    {
+        adapter.PutItem(new XElement(XName.Get("substitute", "http://fogid.net/o/"),
+            new XAttribute("old-id", "alice"),
+            new XAttribute("new-id", "bob")));
+    }
+    catch (NotSupportedException)
+    {
+        substituteRejected = true;
+    }
+    Check(substituteRejected, "substitute explicitly rejected instead of silently ignored");
+    Check(adapter.GetItemByIdBasic("alice", false)?.ToString() == oldAlice,
+        "rejected substitute does not change existing resource");
+    Check(HasResult(adapter.SearchByName("Ali"), "alice"),
+        "rejected substitute preserves name index");
+    Check(adapter.GetInverseRecords("bob").Any(),
+        "rejected substitute preserves inverse index");
     adapter.PutItem(Item("alice", "Alicia North", "Blueberry project", "bob"));
     Check(HasResult(adapter.SearchByName("Alic"), "alice"), "updated name search");
     Check(!HasResult(adapter.SearchByName("Alice"), "alice"), "old name removed from search");
