@@ -233,7 +233,17 @@ namespace Factograph.Data.Adapters
                                 XAttribute? att = el.Attribute("{http://www.w3.org/1999/02/22-rdf-syntax-ns#}resource");
                                 if (att != null)
                                 {
-                                    return new object[] { 2, new object[] { pred, att.Value } };
+                                    string target = att.Value;
+                                    // FillDb resolves substitute chains before passing the
+                                    // current resource stream. Preserve dangling delete links,
+                                    // but redirect links whose target was substituted.
+                                    if (orig_ids != null &&
+                                        orig_ids.TryGetValue(target, out string? replacement) &&
+                                        replacement != null)
+                                    {
+                                        target = replacement;
+                                    }
+                                    return new object[] { 2, new object[] { pred, target } };
                                 }
                                 else
                                 {
