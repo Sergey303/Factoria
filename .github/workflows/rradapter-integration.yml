@@ -1,0 +1,33 @@
+name: RRAdapter integration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Factograph.Data/**'
+      - 'tests/RRAdapter.Integration/**'
+      - '.github/workflows/rradapter-integration.yml'
+  pull_request:
+    paths:
+      - 'Factograph.Data/**'
+      - 'tests/RRAdapter.Integration/**'
+      - '.github/workflows/rradapter-integration.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  rr-adapter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build integration suite
+        run: dotnet build tests/RRAdapter.Integration/RRAdapter.Integration.csproj --configuration Release
+      - name: Regression scenarios
+        run: dotnet run --project tests/RRAdapter.Integration/RRAdapter.Integration.csproj --configuration Release --no-build
+      - name: Bulk and abrupt process stop (12,000 records)
+        run: dotnet run --project tests/RRAdapter.Integration/RRAdapter.Integration.csproj --configuration Release --no-build -- stage3-all 12000
