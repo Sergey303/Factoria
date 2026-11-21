@@ -174,11 +174,16 @@ try
         new(XName.Get("substitute", "http://fogid.net/o/"),
             new XAttribute("old-id", oldId),
             new XAttribute("new-id", newId));
+    XElement CanonicalRedirect(string oldId, string newId) =>
+        new(XName.Get("substitute", "http://fogid.net/o/"),
+            new XAttribute(XName.Get("about", rdf), oldId),
+            new XElement(XName.Get("newid", "http://fogid.net/u/"),
+                new XAttribute(XName.Get("resource", rdf), newId)));
     new XElement(rootName,
         Item("alice", "Alice", "Follows replacement", "old-bob"),
         Item("bob", "Bob", "Target"),
         Redirect("old-bob", "middle-bob"),
-        Redirect("middle-bob", "bob")).Save(fogPath);
+        CanonicalRedirect("middle-bob", "bob")).Save(fogPath);
     adapter = Open();
     adapter.FillDb(new[] { new FogInfo { pth = fogPath } }, _ => { });
     adapter.FinishFillDb(_ => { });
@@ -191,7 +196,7 @@ try
         Item("alice", "Alice", "Original", "bob"),
         Item("bob", "Bob", "Target"),
         Redirect("cycle-a", "cycle-b"),
-        Redirect("cycle-b", "cycle-a")).Save(fogPath);
+        CanonicalRedirect("cycle-b", "cycle-a")).Save(fogPath);
     adapter = Open();
     bool cycleRejected = false;
     try
