@@ -543,9 +543,21 @@ namespace Factograph.Data.Adapters
                     new XAttribute(ONames.rdfabout, ConvertId(xel.Attribute("id").Value)) :
                     new XAttribute(xel.Attribute(ONames.rdfabout)),
                 xel.Attribute("mT") == null ? null : new XAttribute(xel.Attribute("mT")));
-            else if (xel.Name == "substitute" || xel.Name == ONames.fogi + "substitute") return new XElement(ONames.fogi + "substitute",
-                new XAttribute("old-id", ConvertId(xel.Attribute("old-id").Value)),
-                new XAttribute("new-id", ConvertId(xel.Attribute("new-id").Value)));
+            else if (xel.Name == "substitute" || xel.Name == ONames.fogi + "substitute")
+            {
+                // Legacy Fog uses old-id/new-id; canonical Fog uses rdf:about
+                // with u:newid/@rdf:resource. Normalize both before indexing.
+                string? oldId = xel.Attribute("old-id")?.Value ??
+                    xel.Attribute(ONames.rdfabout)?.Value;
+                string? newId = xel.Attribute("new-id")?.Value ??
+                    xel.Element("{http://fogid.net/u/}newid")?
+                        .Attribute(ONames.rdfresource)?.Value;
+                if (string.IsNullOrWhiteSpace(oldId) || string.IsNullOrWhiteSpace(newId))
+                    throw new InvalidDataException("Fog substitute requires both old and new identifiers.");
+                return new XElement(ONames.fogi + "substitute",
+                    new XAttribute("old-id", ConvertId(oldId)),
+                    new XAttribute("new-id", ConvertId(newId)));
+            }
             else
             {
                 string id = ConvertId(xel.Attribute(ONames.rdfabout).Value);
