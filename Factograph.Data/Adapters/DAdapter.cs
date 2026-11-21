@@ -132,15 +132,20 @@ namespace Factograph.Data.Adapters
             GC.Collect();
 
             // Функция, добирающаяся до последнего определения или это и есть последнее
-            Func<string, string> original = null;
-            original = id =>
+            Func<string, string> original = id =>
             {
-                if (substitutes.TryGetValue(id, out string idd))
+                // A malformed Fog substitution cycle must fail explicitly instead
+                // of recursing indefinitely (or overflowing the stack).
+                var seen = new HashSet<string>(StringComparer.Ordinal);
+                string current = id;
+                while (substitutes.TryGetValue(current, out string? next) && next != null)
                 {
-                    if (idd == null) return id;
-                    return original(idd);
+                    if (!seen.Add(current))
+                        throw new InvalidDataException(
+                            $"Cyclic Fog substitution detected at '{current}'.");
+                    current = next;
                 }
-                return id;
+                return current;
             };
 
             // Обработаем словарь, формируя новый 
@@ -387,15 +392,20 @@ namespace Factograph.Data.Adapters
             Console.WriteLine("Dictionary lastTime = " + lastTime.Count + " redefinitions=" + redefinitions);
 
             // Функция, добирающаяся до последнего определения или это и есть последнее
-            Func<string, string> original = null;
-            original = id =>
+            Func<string, string> original = id =>
             {
-                if (substitutes.TryGetValue(id, out string idd))
+                // A malformed Fog substitution cycle must fail explicitly instead
+                // of recursing indefinitely (or overflowing the stack).
+                var seen = new HashSet<string>(StringComparer.Ordinal);
+                string current = id;
+                while (substitutes.TryGetValue(current, out string? next) && next != null)
                 {
-                    if (idd == null) return id;
-                    return original(idd);
+                    if (!seen.Add(current))
+                        throw new InvalidDataException(
+                            $"Cyclic Fog substitution detected at '{current}'.");
+                    current = next;
                 }
-                return id;
+                return current;
             };
 
             // Обработаем словарь, формируя новый 
