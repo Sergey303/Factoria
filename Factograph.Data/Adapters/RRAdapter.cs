@@ -208,6 +208,44 @@ namespace Factograph.Data.Adapters
             Console.WriteLine($"==={DateTime.Now}===After Init === Total Memory: " + GC.GetTotalMemory(true));
         }
 
+        /// <summary>
+        /// Builds an isolated, closed set of Polar.DB sequence and index files.
+        /// The caller must validate and publish it through an atomic generation
+        /// protocol; this method never changes the current live RRAdapter.
+        /// </summary>
+        public void PrepareIsolatedGeneration(
+            string generationDirectory, IEnumerable<FogInfo> fogs)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(generationDirectory);
+            ArgumentNullException.ThrowIfNull(fogs);
+            string directory = Path.GetFullPath(generationDirectory);
+            string current = Path.GetFullPath(dbfolder);
+            if (string.Equals(
+                directory.TrimEnd(Path.DirectorySeparatorChar),
+                current.TrimEnd(Path.DirectorySeparatorChar),
+                StringComparison.Ordinal))
+                throw new ArgumentException(
+                    "A generation must not overwrite the active RRAdapter storage.",
+                    nameof(generationDirectory));
+            if (Directory.Exists(directory) &&
+                Directory.EnumerateFileSystemEntries(directory).Any())
+                throw new IOException("Generation directory must be empty.");
+
+            Directory.CreateDirectory(directory);
+            var staged = new RRAdapter(Normalize);
+            try
+            {
+                staged.Init("rr:" + directory + Path.DirectorySeparatorChar);
+                staged.StartFillDb(_ => { });
+                staged.FillDb(fogs, _ => { });
+                staged.FinishFillDb(_ => { });
+            }
+            finally
+            {
+                staged.Close();
+            }
+        }
+
         //public void Load(IEnumerable<object> flow)
         //{
         //    records.Clear();
