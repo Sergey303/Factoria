@@ -780,6 +780,14 @@ namespace Factograph.Data
         }
         public XElement PutItem(XElement item)
         {
+            ArgumentNullException.ThrowIfNull(item);
+            // RRAdapter cannot yet apply a multi-record substitute atomically.
+            // Reject before modifying the in-memory Fog tree, writing the source
+            // file or appending a log entry; otherwise source and index diverge.
+            if (item.Name.LocalName == "substitute" && adapter is RRAdapter)
+                return new XElement("error",
+                    "RRAdapter cannot apply substitute incrementally. " +
+                    "Commit the directive through a supported Fog writer and rebuild the index.");
             //XElement result = null;
             string? owner = item.Attribute("owner")?.Value;
 
