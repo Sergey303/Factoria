@@ -252,6 +252,14 @@ try
     Check(prepared.GetInverseRecords("next-bob").Any(),
         "prepared generation has inverse index");
     prepared.Close();
+    // A generation switch reuses the adapter object: physical stream file
+    // numbering must restart at zero instead of creating new empty files.
+    prepared.Init("rr:" + preparedRoot + Path.DirectorySeparatorChar);
+    Check(HasResult(prepared.SearchByWords("ISOLATEDBUILD"), "next-alice"),
+        "same adapter instance can reopen prepared generation");
+    Check(prepared.GetInverseRecords("next-bob").Any(),
+        "reopened adapter retains prepared inverse index");
+    prepared.Close();
     Console.WriteLine("ALL INTEGRATION CHECKS PASSED");
 }
 finally
