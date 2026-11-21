@@ -77,6 +77,9 @@ namespace Factograph.Data.Adapters
             }
             //else dbfolder = connectionstring.Substring(4);
 
+            // Reinitialize the physical sequence numbering when reopening this
+            // adapter (including after switching to another committed generation).
+            file_no = 0;
             this.nodatabase = false;
             if (!File.Exists(dbfolder + "0.bin"))
             {
