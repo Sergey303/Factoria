@@ -230,6 +230,28 @@ try
     Check(adapter.GetRecord("alice") is not null,
         "malformed directive does not clear existing database");
     adapter.Close();
+    // Prepare a replacement generation without clearing or updating the active
+    // USequence. A later publisher can point CURRENT to this directory.
+    new XElement(rootName,
+        Item("next-alice", "Next Alice", "ISOLATEDBUILD", "next-bob"),
+        Item("next-bob", "Next Bob", "Fresh target")).Save(fogPath);
+    string preparedRoot = Path.Combine(db, "prepared-generation");
+    adapter = Open();
+    string? unchanged = adapter.GetItemByIdBasic("alice", false)?.ToString();
+    adapter.PrepareIsolatedGeneration(preparedRoot,
+        new[] { new FogInfo { pth = fogPath } });
+    Check(adapter.GetItemByIdBasic("alice", false)?.ToString() == unchanged,
+        "isolated preparation leaves active database unchanged");
+    Check(adapter.GetRecord("next-alice") is null,
+        "staged records are not visible in active database");
+    adapter.Close();
+    var prepared = new RRAdapter(null);
+    prepared.Init("rr:" + preparedRoot + Path.DirectorySeparatorChar);
+    Check(HasResult(prepared.SearchByWords("ISOLATEDBUILD"), "next-alice"),
+        "prepared generation has searchable word index");
+    Check(prepared.GetInverseRecords("next-bob").Any(),
+        "prepared generation has inverse index");
+    prepared.Close();
     Console.WriteLine("ALL INTEGRATION CHECKS PASSED");
 }
 finally
