@@ -181,6 +181,7 @@ try
         Redirect("middle-bob", "bob")).Save(fogPath);
     adapter = Open();
     adapter.FillDb(new[] { new FogInfo { pth = fogPath } }, _ => { });
+    adapter.FinishFillDb(_ => { });
     Check(adapter.GetInverseRecords("bob").Any(),
         "transitive Fog substitution redirects to final target");
     Check(!adapter.GetInverseRecords("old-bob").Any(),
