@@ -211,6 +211,25 @@ try
     Check(adapter.GetRecord("alice") is not null,
         "cycle failure preserves the previous database");
     adapter.Close();
+
+    // Malformed directives must not start a destructive rebuild either.
+    new XElement(rootName,
+        new XElement(XName.Get("substitute", "http://fogid.net/o/"),
+            new XAttribute(XName.Get("about", rdf), "bob"))).Save(fogPath);
+    adapter = Open();
+    bool malformedRejected = false;
+    try
+    {
+        adapter.FillDb(new[] { new FogInfo { pth = fogPath } }, _ => { });
+    }
+    catch (InvalidDataException)
+    {
+        malformedRejected = true;
+    }
+    Check(malformedRejected, "incomplete canonical substitute rejected");
+    Check(adapter.GetRecord("alice") is not null,
+        "malformed directive does not clear existing database");
+    adapter.Close();
     Console.WriteLine("ALL INTEGRATION CHECKS PASSED");
 }
 finally
