@@ -166,6 +166,45 @@ try
     Check(!adapter.GetInverseRecords("old-bob").Any(),
         "obsolete inverse link stays absent after reopen");
     adapter.Close();
+    // Real Fog pipeline: transitive substitution must resolve to the final
+    // identity, and cycles must fail before LoadXFlow clears any live data.
+    string fogPath = Path.Combine(db, "p0-substitute.fog");
+    var rootName = XName.Get("RDF", rdf);
+    XElement Redirect(string oldId, string newId) =>
+        new(XName.Get("substitute", "http://fogid.net/o/"),
+            new XAttribute("old-id", oldId),
+            new XAttribute("new-id", newId));
+    new XElement(rootName,
+        Item("alice", "Alice", "Follows replacement", "old-bob"),
+        Item("bob", "Bob", "Target"),
+        Redirect("old-bob", "middle-bob"),
+        Redirect("middle-bob", "bob")).Save(fogPath);
+    adapter = Open();
+    adapter.FillDb(new[] { new FogInfo { pth = fogPath } }, _ => { });
+    Check(adapter.GetInverseRecords("bob").Any(),
+        "transitive Fog substitution redirects to final target");
+    Check(!adapter.GetInverseRecords("old-bob").Any(),
+        "transitive Fog substitution removes old inverse key");
+    adapter.Close();
+    new XElement(rootName,
+        Item("alice", "Alice", "Original", "bob"),
+        Item("bob", "Bob", "Target"),
+        Redirect("cycle-a", "cycle-b"),
+        Redirect("cycle-b", "cycle-a")).Save(fogPath);
+    adapter = Open();
+    bool cycleRejected = false;
+    try
+    {
+        adapter.FillDb(new[] { new FogInfo { pth = fogPath } }, _ => { });
+    }
+    catch (InvalidDataException)
+    {
+        cycleRejected = true;
+    }
+    Check(cycleRejected, "cyclic Fog substitution rejected without recursion");
+    Check(adapter.GetRecord("alice") is not null,
+        "cycle failure preserves the previous database");
+    adapter.Close();
     Console.WriteLine("ALL INTEGRATION CHECKS PASSED");
 }
 finally
