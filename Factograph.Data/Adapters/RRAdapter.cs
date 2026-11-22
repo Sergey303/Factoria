@@ -510,7 +510,14 @@ namespace Factograph.Data.Adapters
 
         public override XElement Delete(string id)
         {
-            throw new NotImplementedException();
+            ArgumentException.ThrowIfNullOrWhiteSpace(id);
+            XElement? previous = GetItemByIdBasic(id, false);
+            if (previous == null)
+                return null!;
+
+            PutItem(new XElement("delete",
+                new XAttribute(ONames.rdfabout, id)));
+            return previous;
         }
 
         public override XElement? PutItem(XElement record)
