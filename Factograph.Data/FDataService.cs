@@ -49,7 +49,7 @@ namespace Factograph.Data
 
         public IOntology ontology { get; set; }
 
-        CassInfo[] IFDataService.Cassettes => throw new NotImplementedException();
+        CassInfo[] IFDataService.Cassettes => Cassettes;
 
         private TRecordBuilder? _tbuilder = null;
         public TRecordBuilder? TBuilder { get { return _tbuilder; } }
