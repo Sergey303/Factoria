@@ -488,7 +488,96 @@ namespace Factograph.Data.Adapters
 
         public override XElement GetItemById(string id, XElement format)
         {
-            throw new NotImplementedException();
+            ArgumentNullException.ThrowIfNull(format);
+            object? record = GetRecord(id, true);
+            if (record == null || Isnull(record))
+                return null!;
+            return ProjectRecord((object[])record, format, new HashSet<string>(StringComparer.Ordinal));
+        }
+
+        // Use the same query-format contract as UpiAdapter: field, direct and
+        // inverse projections. A visited-path guard prevents cyclic graph
+        // relationships from causing unbounded recursive serialization.
+        private XElement ProjectRecord(object[] record, XElement format, HashSet<string> path)
+        {
+            string id = (string)record[0];
+            string type = (string)record[1];
+            var result = new XElement("record",
+                new XAttribute("id", id),
+                new XAttribute("type", type));
+            if (!path.Add(id))
+                return result;
+
+            try
+            {
+                object[][] props = ((object[])record[2]).Cast<object[]>().ToArray();
+                foreach (XElement request in format.Elements())
+                {
+                    string? predicate = (string?)request.Attribute("prop");
+                    if (string.IsNullOrEmpty(predicate))
+                        continue;
+
+                    if (request.Name.LocalName == "field")
+                    {
+                        foreach (object[] prop in props.Where(p => (int)p[0] == 1))
+                        {
+                            object[] field = (object[])prop[1];
+                            if ((string)field[0] != predicate)
+                                continue;
+                            result.Add(new XElement("field",
+                                new XAttribute("prop", predicate),
+                                field[2] is null ? null : new XAttribute(ONames.xmllang, field[2]),
+                                field[1]));
+                        }
+                    }
+                    else if (request.Name.LocalName == "direct")
+                    {
+                        foreach (object[] prop in props.Where(p => (int)p[0] == 2))
+                        {
+                            object[] link = (object[])prop[1];
+                            if ((string)link[0] != predicate)
+                                continue;
+                            object? target = GetRecord((string)link[1], false);
+                            if (target == null || Isnull(target))
+                                continue;
+                            var nested = SelectFormat(request, (string)((object[])target)[1]);
+                            if (nested != null)
+                                result.Add(new XElement("direct",
+                                    new XAttribute("prop", predicate),
+                                    ProjectRecord((object[])target, nested, path)));
+                        }
+                    }
+                    else if (request.Name.LocalName == "inverse")
+                    {
+                        foreach (object[] prop in props.Where(p => (int)p[0] == 3))
+                        {
+                            object[] link = (object[])prop[1];
+                            if ((string)link[0] != predicate)
+                                continue;
+                            object? source = GetRecord((string)link[1], false);
+                            if (source == null || Isnull(source))
+                                continue;
+                            var nested = SelectFormat(request, (string)((object[])source)[1]);
+                            if (nested != null)
+                                result.Add(new XElement("inverse",
+                                    new XAttribute("prop", predicate),
+                                    ProjectRecord((object[])source, nested, path)));
+                        }
+                    }
+                }
+                return result;
+            }
+            finally
+            {
+                path.Remove(id);
+            }
+        }
+
+        private static XElement? SelectFormat(XElement request, string recordType)
+        {
+            return request.Elements("record")
+                .FirstOrDefault(x => (string?)x.Attribute("type") == recordType)
+                ?? request.Element("record");
         }
 
         public override void StartFillDb(Action<string> turlog)
