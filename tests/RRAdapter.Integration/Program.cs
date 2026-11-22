@@ -141,6 +141,19 @@ try
     adapter = Open();
     Check(adapter.GetItemByIdBasic("alice", false) is null, "reopen deleted record");
     Check(!HasResult(adapter.SearchByWords("BLUEBERRY"), "alice"), "reopen deleted word index");
+    Check(adapter.Delete("alice") is null, "delete missing id is idempotent");
+    adapter.PutItem(Item("deletable", "Temporary", "Deletion check", "bob"));
+    XElement? removed = adapter.Delete("deletable");
+    Check((string?)removed?.Attribute("id") == "deletable",
+        "Delete returns previous record");
+    Check(adapter.GetItemByIdBasic("deletable", false) is null,
+        "Delete hides primary key immediately");
+    Check(!HasResult(adapter.SearchByName("Temporary"), "deletable"),
+        "Delete hides secondary name index");
+    adapter.Close();
+    adapter = Open();
+    Check(adapter.GetItemByIdBasic("deletable", false) is null,
+        "Delete survives reopen");
     adapter.Close();
 
     // Full Fog rebuild supplies resolved substitution mappings. RRAdapter must
