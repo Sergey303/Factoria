@@ -83,6 +83,27 @@ try
     Check(HasResult(adapter.SearchByWords("ORCHARD"), "alice"), "word search");
     Check(adapter.GetInverseRecords("bob").Any(), "inverse links");
     Check(adapter.GetItemByIdBasic("bob", true)?.Elements("inverse").Any() == true, "inverse XML");
+    XElement view = new XElement("record",
+        new XElement("field", new XAttribute("prop", ontology + "name")),
+        new XElement("direct", new XAttribute("prop", ontology + "knows"),
+            new XElement("record",
+                new XElement("field", new XAttribute("prop", ontology + "name")))));
+    XElement? aliceView = adapter.GetItemById("alice", view);
+    Check(aliceView?.Elements("field").Any(x => x.Value == "Alice North") == true,
+        "formatted lookup projects requested fields");
+    Check(aliceView?.Elements("direct").Elements("record")
+        .Elements("field").Any(x => x.Value == "Bob West") == true,
+        "formatted lookup projects linked records");
+    XElement inverseView = new XElement("record",
+        new XElement("inverse", new XAttribute("prop", ontology + "knows"),
+            new XElement("record",
+                new XElement("field", new XAttribute("prop", ontology + "name")))));
+    Check(adapter.GetItemById("bob", inverseView)?
+        .Elements("inverse").Elements("record").Elements("field")
+        .Any(x => x.Value == "Alice North") == true,
+        "formatted lookup projects inverse records");
+    Check(adapter.GetItemById("nonexistent", view) is null,
+        "formatted lookup returns null for missing records");
     adapter.Close();
 
     adapter = Open();
