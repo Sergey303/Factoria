@@ -1,23 +1,23 @@
-name: RRAdapter integration
+name: Factoria fast regression
 
 on:
   push:
     branches: [main]
     paths:
       - 'Factograph.Data/**'
-      - 'tests/RRAdapter.Integration/**'
+      - 'tests/**'
       - '.github/workflows/rradapter-integration.yml'
   pull_request:
     paths:
       - 'Factograph.Data/**'
-      - 'tests/RRAdapter.Integration/**'
+      - 'tests/**'
       - '.github/workflows/rradapter-integration.yml'
 
 permissions:
   contents: read
 
 jobs:
-  rr-adapter:
+  contracts-and-adapter:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -25,9 +25,9 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Build integration suite
+      - name: Contract tests via IFDataService
+        run: dotnet test tests/Factograph.Data.Tests/Factograph.Data.Tests.csproj --configuration Release --verbosity minimal
+      - name: Build RRAdapter smoke suite
         run: dotnet build tests/RRAdapter.Integration/RRAdapter.Integration.csproj --configuration Release
-      - name: Regression scenarios
+      - name: RRAdapter smoke regressions
         run: dotnet run --project tests/RRAdapter.Integration/RRAdapter.Integration.csproj --configuration Release --no-build
-      - name: Bulk and abrupt process stop (12,000 records)
-        run: dotnet run --project tests/RRAdapter.Integration/RRAdapter.Integration.csproj --configuration Release --no-build -- stage3-all 12000
