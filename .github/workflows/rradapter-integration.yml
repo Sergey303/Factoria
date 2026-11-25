@@ -6,11 +6,13 @@ on:
     paths:
       - 'Factograph.Data/**'
       - 'tests/**'
+      - 'Factoria.Tests.sln'
       - '.github/workflows/rradapter-integration.yml'
   pull_request:
     paths:
       - 'Factograph.Data/**'
       - 'tests/**'
+      - 'Factoria.Tests.sln'
       - '.github/workflows/rradapter-integration.yml'
 
 permissions:
