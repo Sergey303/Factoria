@@ -89,6 +89,47 @@ public sealed class IFDataServiceContractTests
         service.Close();
     }
 
+
+    [Fact]
+    public void Delete_is_persisted_to_Fog_and_survives_reopen()
+    {
+        using var test = new ServiceWorkspace();
+        IFDataService service = test.Open();
+        XElement deletion = new("delete",
+            new XAttribute("owner", "test-owner"),
+            new XAttribute(ServiceWorkspace.Rdf + "about", "alice"));
+        XElement result = service.PutItem(deletion);
+        Assert.Equal("delete", result.Name.LocalName);
+        Assert.Null(service.GetItemByIdBasic("alice", false));
+        Assert.False(ServiceWorkspace.ContainsId(service.SearchByName("Ali"), "alice"));
+        Assert.False(ServiceWorkspace.ContainsId(service.SearchByWords("ORCHARD"), "alice"));
+        Assert.True(XElement.Load(test.FogPath).Elements()
+            .Any(x => x.Name.LocalName == "delete" && (string?)x.Attribute("id") == "alice"));
+        service.Close();
+
+        service = test.Open();
+        Assert.Null(service.GetItemByIdBasic("alice", false));
+        Assert.False(ServiceWorkspace.ContainsId(service.SearchByWords("ORCHARD"), "alice"));
+        service.Close();
+    }
+
+    [Fact]
+    public void Successful_write_produces_a_Fog_entry_and_a_journal_entry()
+    {
+        using var test = new ServiceWorkspace();
+        IFDataService service = test.Open();
+        var result = service.PutItem(ServiceWorkspace.OwnedItem("journal-1", "Journaled", "LOGCHECK"));
+        Assert.Equal("journal-1", (string?)result.Attribute(ServiceWorkspace.Rdf + "about"));
+        Assert.True(File.Exists(test.LogPath));
+        string log = File.ReadAllText(test.LogPath);
+        Assert.Contains("journal-1", log);
+        Assert.Contains("LOGCHECK", log);
+        Assert.Single(XElement.Load(test.FogPath).Elements()
+            .Where(x => (string?)x.Attribute(ServiceWorkspace.Rdf + "about") == "journal-1"));
+        Assert.True(ServiceWorkspace.ContainsId(service.SearchByWords("LOGCHECK"), "journal-1"));
+        service.Close();
+    }
+
     [Fact]
     public void Missing_owner_is_rejected_before_persistence()
     {
