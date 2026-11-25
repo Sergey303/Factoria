@@ -1,0 +1,23 @@
+name: Factoria extended regression
+
+on:
+  schedule:
+    - cron: '15 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stage3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build RRAdapter integration
+        run: dotnet build tests/RRAdapter.Integration/RRAdapter.Integration.csproj --configuration Release
+      - name: 12000 records and abrupt stop after Flush
+        run: dotnet run --project tests/RRAdapter.Integration/RRAdapter.Integration.csproj --configuration Release --no-build -- stage3-all 12000
