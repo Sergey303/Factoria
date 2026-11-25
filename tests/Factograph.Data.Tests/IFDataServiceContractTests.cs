@@ -103,8 +103,8 @@ public sealed class IFDataServiceContractTests
         Assert.Null(service.GetItemByIdBasic("alice", false));
         Assert.False(ServiceWorkspace.ContainsId(service.SearchByName("Ali"), "alice"));
         Assert.False(ServiceWorkspace.ContainsId(service.SearchByWords("ORCHARD"), "alice"));
-        Assert.True(XElement.Load(test.FogPath).Elements()
-            .Any(x => x.Name.LocalName == "delete" && (string?)x.Attribute("id") == "alice"));
+        Assert.Contains(XElement.Load(test.FogPath).Elements(),
+            x => x.Name.LocalName == "delete" && (string?)x.Attribute("id") == "alice");
         service.Close();
 
         service = test.Open();
@@ -124,8 +124,8 @@ public sealed class IFDataServiceContractTests
         string log = File.ReadAllText(test.LogPath);
         Assert.Contains("journal-1", log);
         Assert.Contains("LOGCHECK", log);
-        Assert.Single(XElement.Load(test.FogPath).Elements()
-            .Where(x => (string?)x.Attribute(ServiceWorkspace.Rdf + "about") == "journal-1"));
+        Assert.Single(XElement.Load(test.FogPath).Elements(),
+            x => (string?)x.Attribute(ServiceWorkspace.Rdf + "about") == "journal-1");
         Assert.True(ServiceWorkspace.ContainsId(service.SearchByWords("LOGCHECK"), "journal-1"));
         service.Close();
     }
