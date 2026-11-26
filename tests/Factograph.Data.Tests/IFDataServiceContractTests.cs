@@ -179,6 +179,35 @@ public sealed class IFDataServiceContractTests
     }
 
     [Fact]
+    public void Unavailable_journal_rejects_write_before_changing_Fog_and_index()
+    {
+        using var workspace = new ServiceWorkspace();
+        IFDataService service = workspace.Open();
+        string original = File.ReadAllText(workspace.FogPath);
+        Directory.CreateDirectory(workspace.LogPath);
+        try
+        {
+            Exception? error = Record.Exception(() =>
+                service.PutItem(ServiceWorkspace.OwnedItem(
+                    "blocked", "Blocked", "JOURNALBLOCKED")));
+            Assert.True(error is IOException or UnauthorizedAccessException,
+                $"Expected journal I/O failure, got {error?.GetType().Name ?? "none"}");
+            Assert.Equal(original, File.ReadAllText(workspace.FogPath));
+            Assert.False(ServiceWorkspace.ContainsId(
+                service.SearchByWords("JOURNALBLOCKED"), "blocked"));
+        }
+        finally
+        {
+            Directory.Delete(workspace.LogPath);
+        }
+        service.Close();
+
+        service = workspace.Open();
+        Assert.Null(service.GetItemByIdBasic("blocked", false));
+        service.Close();
+    }
+
+    [Fact]
     public void Missing_owner_is_rejected_before_persistence()
     {
         using var test = new ServiceWorkspace();
