@@ -905,6 +905,12 @@ namespace Factograph.Data
             }
             else pendingFog.Add(nitem);
 
+            // Fail before publishing Fog or updating the index if the
+            // required journal cannot even be opened. This is a preflight
+            // check, not a cross-file transaction or a guarantee against
+            // subsequent disk/write failures.
+            using Stream log = File.Open(putlogfilename, FileMode.Append, FileAccess.Write);
+
             // Сохраняем файл
             SaveFogAtomically(pendingFog, fi.pth);
 
@@ -913,11 +919,9 @@ namespace Factograph.Data
             fi.fogx = pendingFog;
 
             // Сохраняем в логе
-            using (Stream log = File.Open(putlogfilename, FileMode.Append, FileAccess.Write))
+            using (TextWriter tw = new StreamWriter(log, System.Text.Encoding.UTF8))
             {
-                TextWriter tw = new StreamWriter(log, System.Text.Encoding.UTF8);
                 tw.WriteLine(nitem.ToString());
-                tw.Close();
             }
 
             return new XElement(nitem);
