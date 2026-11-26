@@ -208,6 +208,42 @@ public sealed class IFDataServiceContractTests
     }
 
     [Fact]
+    public void Failed_Fog_publication_does_not_consume_an_auto_generated_identifier()
+    {
+        using var workspace = new ServiceWorkspace();
+        IFDataService service = workspace.Open();
+        service.PutItem(ServiceWorkspace.OwnedItem("warm", "Warm", "WARM"));
+        string backup = workspace.FogPath + ".backup";
+        File.Move(workspace.FogPath, backup);
+        Directory.CreateDirectory(workspace.FogPath);
+        try
+        {
+            var candidate = new XElement(ServiceWorkspace.O + "person",
+                new XAttribute("owner", "test-owner"),
+                new XElement(ServiceWorkspace.O + "name", "FailedAuto"));
+            Exception? error = Record.Exception(() => service.PutItem(candidate));
+            Assert.True(error is IOException or UnauthorizedAccessException);
+        }
+        finally
+        {
+            Directory.Delete(workspace.FogPath);
+            File.Move(backup, workspace.FogPath);
+        }
+
+        var next = new XElement(ServiceWorkspace.O + "person",
+            new XAttribute("owner", "test-owner"),
+            new XElement(ServiceWorkspace.O + "name", "GoodAuto"));
+        XElement created = service.PutItem(next);
+        Assert.Equal("test-10",
+            (string?)created.Attribute(ServiceWorkspace.Rdf + "about"));
+        Assert.Equal("11", (string?)XElement.Load(workspace.FogPath)
+            .Attribute("counter"));
+        Assert.DoesNotContain(XElement.Load(workspace.FogPath).Elements(),
+            x => x.Element(ServiceWorkspace.O + "name")?.Value == "FailedAuto");
+        service.Close();
+    }
+
+    [Fact]
     public void Missing_owner_is_rejected_before_persistence()
     {
         using var test = new ServiceWorkspace();
