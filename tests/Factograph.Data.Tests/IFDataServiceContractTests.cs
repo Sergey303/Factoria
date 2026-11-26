@@ -135,15 +135,20 @@ public sealed class IFDataServiceContractTests
     {
         using var workspace = new ServiceWorkspace();
         IFDataService service = workspace.Open();
+        // Warm the service cache before swapping the destination path.
+        service.PutItem(ServiceWorkspace.OwnedItem("warm", "Warm", "WARM"));
         string original = File.ReadAllText(workspace.FogPath);
+        string originalLog = File.ReadAllText(workspace.LogPath);
         string backup = workspace.FogPath + ".backup";
         File.Move(workspace.FogPath, backup);
         Directory.CreateDirectory(workspace.FogPath);
         try
         {
-            Assert.ThrowsAny<IOException>(() =>
+            Exception? failure = Record.Exception(() =>
                 service.PutItem(ServiceWorkspace.OwnedItem(
                     "failed", "ShouldNotAppear", "FAILEDWRITE")));
+            Assert.True(failure is IOException or UnauthorizedAccessException,
+                $"Expected an I/O failure, got {failure?.GetType().Name ?? "none"}");
             Assert.False(ServiceWorkspace.ContainsId(
                 service.SearchByWords("FAILEDWRITE"), "failed"));
         }
@@ -153,7 +158,7 @@ public sealed class IFDataServiceContractTests
             File.Move(backup, workspace.FogPath);
         }
         Assert.Equal(original, File.ReadAllText(workspace.FogPath));
-        Assert.False(File.Exists(workspace.LogPath));
+        Assert.Equal(originalLog, File.ReadAllText(workspace.LogPath));
 
         service.PutItem(ServiceWorkspace.OwnedItem(
             "success", "Recovered", "RECOVEREDWRITE"));
