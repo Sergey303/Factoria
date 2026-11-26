@@ -810,6 +810,10 @@ namespace Factograph.Data
             // Если фог не загружен, то загрузить его
             if (fi.fogx == null) fi.fogx = XElement.Load(fi.pth);
 
+            // Work on a detached copy. A failed disk write must never mutate
+            // the cached Fog document or advance its in-memory ID counter.
+            XElement pendingFog = new XElement(fi.fogx);
+
             // Изымаем из пришедшего элемента владельца и фиксируем его в фоге
             XAttribute? owner_att = item.Attribute("owner");
             if (owner_att != null) owner_att.Remove();
@@ -829,8 +833,8 @@ namespace Factograph.Data
                 XElement? element = null; // запись с пришедшим идентификатором
                 if (id == null)
                 {
-                    XAttribute? counter_att = fi.fogx.Attribute("counter");
-                    XAttribute? prefix_att = fi.fogx.Attribute("prefix");
+                    XAttribute? counter_att = pendingFog.Attribute("counter");
+                    XAttribute? prefix_att = pendingFog.Attribute("prefix");
                     if (counter_att != null && prefix_att != null)
                     {
                         int counter = Int32.Parse(counter_att.Value);
@@ -855,7 +859,7 @@ namespace Factograph.Data
                 }
                 else
                 {
-                    element = fi.fogx.Elements().FirstOrDefault(el =>
+                    element = pendingFog.Elements().FirstOrDefault(el =>
                         el.Attribute("{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about")?.Value == id);
                 }
 
@@ -895,17 +899,18 @@ namespace Factograph.Data
                     nitem1.Add(new XAttribute("id", att_id.Value));
                     nitem1.Add(attributes.Where(a => a.Name.LocalName != "about"));
 
-                    fi.fogx.Add(nitem1);
+                    pendingFog.Add(nitem1);
                 }
-                else fi.fogx.Add(nitem);
+                else pendingFog.Add(nitem);
             }
-            else fi.fogx.Add(nitem);
+            else pendingFog.Add(nitem);
 
             // Сохраняем файл
-            fi.fogx.Save(fi.pth);
+            SaveFogAtomically(pendingFog, fi.pth);
 
             // Сохраняем в базе данных
             adapter.PutItem(nitem);
+            fi.fogx = pendingFog;
 
             // Сохраняем в логе
             using (Stream log = File.Open(putlogfilename, FileMode.Append, FileAccess.Write))
@@ -918,6 +923,32 @@ namespace Factograph.Data
             return new XElement(nitem);
         }
 
+
+        // Replace the whole Fog document, never truncate its published file in
+        // place. Temp and destination share a directory/filesystem.
+        private static void SaveFogAtomically(XElement document, string destination)
+        {
+            string temporary = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                using (var stream = new FileStream(temporary, FileMode.CreateNew,
+                           FileAccess.Write, FileShare.None))
+                {
+                    document.Save(stream);
+                    stream.Flush(flushToDisk: true);
+                }
+
+                if (File.Exists(destination))
+                    File.Replace(temporary, destination, null);
+                else
+                    File.Move(temporary, destination);
+            }
+            finally
+            {
+                if (File.Exists(temporary))
+                    File.Delete(temporary);
+            }
+        }
 
         private static (string owner, string prefix, string counter) ReadFogAttributes(string pth)
         {
