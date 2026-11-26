@@ -64,6 +64,23 @@ should get its own fixture configuration and run the same contract assertions
 where it supports the same contract; unsupported capabilities must be explicitly
 documented, not silently skipped.
 
-**Not yet covered:** failure injection between Fog save, adapter update and log
-append; fault-tolerant Fog writes; full incremental substitute semantics; HTTP
-application tests. Passing the current suite does not establish those properties.
+## Fault-injection coverage
+
+The IFDataService suite now verifies:
+- Failed publication of a Fog file does not contaminate the cached XML or a
+  subsequent successful write.
+- A failed Fog publication does not advance the generated identifier counter.
+- A journal path that cannot be opened causes rejection **before** changing
+  Fog or adapter-visible data.
+- Expected accepted operations remain visible in Fog, indexes and journal.
+
+Fog publication uses a temporary file in the same directory and replacement
+of the destination. This avoids in-place XML truncation. The journal is
+preflight-opened but appended after the index update.
+
+**Still not guaranteed:** atomicity across Fog, adapter and journal under a
+failure **after** Fog publication; mid-append journal I/O errors (e.g. disk
+full); simultaneous writers; forced process termination in each interval;
+filesystem/power-loss durability beyond the file flush; full incremental
+`substitute`; HTTP application tests. Do not interpret the green tests as
+proof of a cross-file transaction.
