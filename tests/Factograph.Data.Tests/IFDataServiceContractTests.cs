@@ -131,6 +131,49 @@ public sealed class IFDataServiceContractTests
     }
 
     [Fact]
+    public void Failed_Fog_save_does_not_poison_next_write_or_advance_counter()
+    {
+        using var workspace = new ServiceWorkspace();
+        IFDataService service = workspace.Open();
+        string original = File.ReadAllText(workspace.FogPath);
+        string backup = workspace.FogPath + ".backup";
+        File.Move(workspace.FogPath, backup);
+        Directory.CreateDirectory(workspace.FogPath);
+        try
+        {
+            Assert.ThrowsAny<IOException>(() =>
+                service.PutItem(ServiceWorkspace.OwnedItem(
+                    "failed", "ShouldNotAppear", "FAILEDWRITE")));
+            Assert.False(ServiceWorkspace.ContainsId(
+                service.SearchByWords("FAILEDWRITE"), "failed"));
+        }
+        finally
+        {
+            Directory.Delete(workspace.FogPath);
+            File.Move(backup, workspace.FogPath);
+        }
+        Assert.Equal(original, File.ReadAllText(workspace.FogPath));
+        Assert.False(File.Exists(workspace.LogPath));
+
+        service.PutItem(ServiceWorkspace.OwnedItem(
+            "success", "Recovered", "RECOVEREDWRITE"));
+        var persisted = XElement.Load(workspace.FogPath);
+        Assert.DoesNotContain(persisted.Elements(),
+            x => (string?)x.Attribute(ServiceWorkspace.Rdf + "about") == "failed");
+        Assert.Contains(persisted.Elements(),
+            x => (string?)x.Attribute(ServiceWorkspace.Rdf + "about") == "success");
+        Assert.False(ServiceWorkspace.ContainsId(
+            service.SearchByWords("FAILEDWRITE"), "failed"));
+        service.Close();
+
+        service = workspace.Open();
+        Assert.Null(service.GetItemByIdBasic("failed", false));
+        Assert.True(ServiceWorkspace.ContainsId(
+            service.SearchByWords("RECOVEREDWRITE"), "success"));
+        service.Close();
+    }
+
+    [Fact]
     public void Missing_owner_is_rejected_before_persistence()
     {
         using var test = new ServiceWorkspace();
