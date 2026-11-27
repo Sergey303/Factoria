@@ -12,6 +12,7 @@ internal sealed class ServiceWorkspace : IDisposable
     private readonly string _path;
     internal readonly string FogPath;
     internal readonly string LogPath;
+    internal string PendingPath => Path.Combine(_path, ".fog-index-pending");
 
     internal ServiceWorkspace(bool writable = true)
     {
