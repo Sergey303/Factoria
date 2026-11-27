@@ -107,3 +107,25 @@ not Polar.DB on-disk internals.
 
 Passing this suite therefore establishes recovery for the tested interrupted
 application write scenarios, not an arbitrary crash-proof multi-file transaction.
+
+## Multiple active services and journal semantics
+
+`FDataService` now publishes a `.fog-commit-generation` token after an
+accepted write (and after successful interrupted-write recovery). Public read
+and write methods compare their startup token with the published version.
+An older service **fails closed** with `InvalidOperationException`; callers
+must dispose/close it and create a fresh `FDataService`. The exclusive
+`.fog-writer.lock` serializes writes; the generation check prevents sequential
+writers from silently clobbering newer Fog data.
+
+The token detects operations committed **through this Factoria service**. It
+does not track manual edits to Fog files, external writers, or the exact moment
+between Fog publication and token publication. A pending marker still governs
+recovery after that interval. An already materialized lazy enumeration is not
+a transactional snapshot.
+
+`logfile_put.txt` is currently **append-only diagnostic history**: there is no
+replay or journal-reading code in `Factograph.Data`. Its file handle is
+preflight-opened and a failed append can still leave Fog/index committed while
+the diagnostic history lacks an entry. The unresolved contract decision is
+whether this must become a durable audit trail; do not treat it as one yet.
