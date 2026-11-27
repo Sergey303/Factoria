@@ -342,7 +342,7 @@ namespace Factograph.Data
             {
                 using (var stream = new FileStream(temporary, FileMode.CreateNew,
                            FileAccess.Write, FileShare.None))
-                using (var writer = new StreamWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true))
+                using (var writer = new StreamWriter(stream, System.Text.Encoding.UTF8, 1024, leaveOpen: true))
                 {
                     writer.Write(Guid.NewGuid().ToString("N"));
                     writer.Flush();
