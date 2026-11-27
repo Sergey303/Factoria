@@ -191,7 +191,11 @@ namespace Factograph.Data
                 if (adapter.nodatabase) nodatabase = true;
                 else nodatabase = false;
 
-                if (pre == "trs" && (directreload || nodatabase)) Load();
+                if (recoveredPendingFog)
+                {
+                    // The adapter was already rebuilt from Fog above.
+                }
+                else if (pre == "trs" && (directreload || nodatabase)) Load();
                 else if (pre == "xml") Load();
                 else if (pre == "om" && (directreload || nodatabase)) Load();
                 else if (pre == "uni") Load(); // Всегда загружать!
@@ -210,11 +214,7 @@ namespace Factograph.Data
                 }
                 else if (pre == "rr")
                 {
-                    if (recoveredPendingFog)
-                    {
-                        // The recovery rebuild above is sufficient.
-                    }
-                    else if (directreload || nodatabase) //Load
+                    if (directreload || nodatabase) //Load
                     {
                         Load();
                         // Надо сохранить точку записи, это делается в конце загрузки.
