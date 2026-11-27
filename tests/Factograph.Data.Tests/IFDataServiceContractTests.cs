@@ -127,6 +127,7 @@ public sealed class IFDataServiceContractTests
         Assert.Single(XElement.Load(test.FogPath).Elements(),
             x => (string?)x.Attribute(ServiceWorkspace.Rdf + "about") == "journal-1");
         Assert.True(ServiceWorkspace.ContainsId(service.SearchByWords("LOGCHECK"), "journal-1"));
+        Assert.False(File.Exists(test.PendingPath));
         service.Close();
     }
 
@@ -159,6 +160,7 @@ public sealed class IFDataServiceContractTests
         }
         Assert.Equal(original, File.ReadAllText(workspace.FogPath));
         Assert.Equal(originalLog, File.ReadAllText(workspace.LogPath));
+        Assert.True(File.Exists(workspace.PendingPath));
 
         service.PutItem(ServiceWorkspace.OwnedItem(
             "success", "Recovered", "RECOVEREDWRITE"));
@@ -169,6 +171,7 @@ public sealed class IFDataServiceContractTests
             x => (string?)x.Attribute(ServiceWorkspace.Rdf + "about") == "success");
         Assert.False(ServiceWorkspace.ContainsId(
             service.SearchByWords("FAILEDWRITE"), "failed"));
+        Assert.False(File.Exists(workspace.PendingPath));
         service.Close();
 
         service = workspace.Open();
