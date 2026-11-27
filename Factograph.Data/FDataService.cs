@@ -768,10 +768,12 @@ namespace Factograph.Data
         // Доступ ка базе данных
         public IEnumerable<XElement> SearchByName(string ss)
         {
+            CheckWriterGeneration();
             return adapter.SearchByName(ss);
         }
         public IEnumerable<XElement> SearchByWords(string ss)
         {
+            CheckWriterGeneration();
             return adapter.SearchByWords(ss);
         }
         
@@ -781,6 +783,7 @@ namespace Factograph.Data
 
         public XElement GetItemByIdBasic(string id, bool addinverse)
         {
+            CheckWriterGeneration();
             var val = adapter.GetItemByIdBasic(id, addinverse);
             gibibCount++;
             if (val != null) gibibCommon += val.Elements().Count();
@@ -814,14 +817,17 @@ namespace Factograph.Data
 
         public XElement GetItemById(string id, XElement format)
         {
+            CheckWriterGeneration();
             return adapter.GetItemById(id, format);
         }
         public IEnumerable<XElement> GetAll()
         {
+            CheckWriterGeneration();
             return adapter.GetAll();
         }
         public XElement UpdateItem(XElement item)
         {
+            CheckWriterGeneration();
             string id = item.Attribute(ONames.rdfabout)?.Value;
             if (id == null)
             {  // точно не апдэйт
@@ -1102,6 +1108,7 @@ namespace Factograph.Data
 
         public IEnumerable<Tuple<string, int, object>> SearchWordsWCR(string line)
         {
+            CheckWriterGeneration();
             return adapter.SearchWordsWCR(line);
         }
     }
