@@ -321,6 +321,38 @@ public sealed class IFDataServiceContractTests
     }
 
     [Fact]
+    public void Previously_opened_writer_must_not_publish_stale_Fog_after_another_commit()
+    {
+        using var workspace = new ServiceWorkspace();
+        IFDataService first = workspace.Open();
+        IFDataService second = workspace.Open();
+
+        first.PutItem(ServiceWorkspace.OwnedItem(
+            "first-writer", "First Writer", "FIRSTCOMMIT"));
+
+        Exception? stale = Record.Exception(() =>
+            second.PutItem(ServiceWorkspace.OwnedItem(
+                "second-writer", "Second Writer", "SECONDCOMMIT")));
+        Assert.IsType<InvalidOperationException>(stale);
+        XElement document = XElement.Load(workspace.FogPath);
+        Assert.Contains(document.Elements(),
+            x => (string?)x.Attribute(ServiceWorkspace.Rdf + "about") == "first-writer");
+        Assert.DoesNotContain(document.Elements(),
+            x => (string?)x.Attribute(ServiceWorkspace.Rdf + "about") == "second-writer");
+
+        second.Close();
+        first.Close();
+        IFDataService restarted = workspace.Open();
+        restarted.PutItem(ServiceWorkspace.OwnedItem(
+            "second-writer", "Second Writer", "SECONDCOMMIT"));
+        Assert.Contains(XElement.Load(workspace.FogPath).Elements(),
+            x => (string?)x.Attribute(ServiceWorkspace.Rdf + "about") == "first-writer");
+        Assert.Contains(XElement.Load(workspace.FogPath).Elements(),
+            x => (string?)x.Attribute(ServiceWorkspace.Rdf + "about") == "second-writer");
+        restarted.Close();
+    }
+
+    [Fact]
     public void Missing_owner_is_rejected_before_persistence()
     {
         using var test = new ServiceWorkspace();
