@@ -77,6 +77,7 @@ namespace Factograph.Data
         private HashSet<string> usedwords = new HashSet<string>(); // использованные слова
         public void Init()
         {
+            recoveredPendingFog = false;
             // Создание словаря если есть файл zaliznyak_shortform.zip
             //if (File.Exists(path + "zaliznyak_shortform.zip"))
             if (dictionary != null && File.Exists(dictionary))
@@ -169,6 +170,19 @@ namespace Factograph.Data
                 adapter.Init(connectionstring);
                 if (XConfig != null) PrepareFogs(XConfig);
 
+                // An interrupted Factoria write may have published Fog without
+                // updating the derived adapter state. Prefer Fog as authority.
+                if (File.Exists(PendingFogCommitPath))
+                {
+                    Load();
+                    File.Delete(PendingFogCommitPath);
+                    // Skip adapter recovery: Load already rebuilt the indexes.
+                    // Do not return here: log path and other Init state follow.
+                    directreload = false;
+                    nodatabase = false;
+                    recoveredPendingFog = true;
+                }
+
                 if (adapter.nodatabase) nodatabase = true;
                 else nodatabase = false;
 
@@ -191,7 +205,11 @@ namespace Factograph.Data
                 }
                 else if (pre == "rr")
                 {
-                    if (directreload || nodatabase) //Load
+                    if (recoveredPendingFog)
+                    {
+                        // The recovery rebuild above is sufficient.
+                    }
+                    else if (directreload || nodatabase) //Load
                     {
                         Load();
                         // Надо сохранить точку записи, это делается в конце загрузки.
@@ -300,6 +318,29 @@ namespace Factograph.Data
             Load();
         }
         private string putlogfilename = null;
+        private bool recoveredPendingFog;
+        private string PendingFogCommitPath => Path.Combine(path, ".fog-index-pending");
+
+        private void EnsurePendingFogRecovered()
+        {
+            if (!File.Exists(PendingFogCommitPath)) return;
+
+            // Rebuild from the original Fog sources through the adapter
+            // contract. Never interpret or repair Polar.DB physical files.
+            Load();
+            File.Delete(PendingFogCommitPath);
+        }
+
+        private void BeginFogCommit()
+        {
+            // An existing marker denotes an unfinished previous write.
+            EnsurePendingFogRecovered();
+            using var file = new FileStream(PendingFogCommitPath,
+                FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            byte[] content = System.Text.Encoding.UTF8.GetBytes("fog-index-v1");
+            file.Write(content, 0, content.Length);
+            file.Flush(flushToDisk: true);
+        }
         public void Close()
         {
             adapter.Close();
@@ -911,7 +952,9 @@ namespace Factograph.Data
             // subsequent disk/write failures.
             using Stream log = File.Open(putlogfilename, FileMode.Append, FileAccess.Write);
 
-            // Сохраняем файл
+            // Durable intent precedes publication. A crash or failure after
+            // this point forces a rebuild from Fog before further writes.
+            BeginFogCommit();
             SaveFogAtomically(pendingFog, fi.pth);
 
             // Сохраняем в базе данных
@@ -924,6 +967,7 @@ namespace Factograph.Data
                 tw.WriteLine(nitem.ToString());
             }
 
+            File.Delete(PendingFogCommitPath);
             return new XElement(nitem);
         }
 
