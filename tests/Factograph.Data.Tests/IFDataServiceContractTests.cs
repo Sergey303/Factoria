@@ -334,6 +334,12 @@ public sealed class IFDataServiceContractTests
             second.PutItem(ServiceWorkspace.OwnedItem(
                 "second-writer", "Second Writer", "SECONDCOMMIT")));
         Assert.IsType<InvalidOperationException>(stale);
+        Assert.Throws<InvalidOperationException>(() =>
+            second.SearchByWords("FIRSTCOMMIT").ToArray());
+        Assert.Throws<InvalidOperationException>(() =>
+            second.GetItemByIdBasic("first-writer", false));
+        Assert.Throws<InvalidOperationException>(() =>
+            second.GetAll().ToArray());
         XElement document = XElement.Load(workspace.FogPath);
         Assert.Contains(document.Elements(),
             x => (string?)x.Attribute(ServiceWorkspace.Rdf + "about") == "first-writer");
