@@ -174,8 +174,13 @@ namespace Factograph.Data
                 // updating the derived adapter state. Prefer Fog as authority.
                 if (File.Exists(PendingFogCommitPath))
                 {
-                    Load();
-                    File.Delete(PendingFogCommitPath);
+                    using var recoveryLease = AcquireFogWriteLease();
+                    // Another writer could have finished while we waited.
+                    if (File.Exists(PendingFogCommitPath))
+                    {
+                        Load();
+                        File.Delete(PendingFogCommitPath);
+                    }
                     // Skip adapter recovery: Load already rebuilt the indexes.
                     // Do not return here: log path and other Init state follow.
                     directreload = false;
@@ -320,6 +325,11 @@ namespace Factograph.Data
         private string putlogfilename = null;
         private bool recoveredPendingFog;
         private string PendingFogCommitPath => Path.Combine(path, ".fog-index-pending");
+        private string FogWriterLockPath => Path.Combine(path, ".fog-writer.lock");
+
+        private FileStream AcquireFogWriteLease() =>
+            new FileStream(FogWriterLockPath,
+                FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
 
         private void EnsurePendingFogRecovered()
         {
@@ -826,6 +836,12 @@ namespace Factograph.Data
         public XElement PutItem(XElement item)
         {
             ArgumentNullException.ThrowIfNull(item);
+            using var writerLease = AcquireFogWriteLease();
+            return PutItemCore(item);
+        }
+
+        private XElement PutItemCore(XElement item)
+        {
             // RRAdapter cannot yet apply a multi-record substitute atomically.
             // Reject before modifying the in-memory Fog tree, writing the source
             // file or appending a log entry; otherwise source and index diverge.
