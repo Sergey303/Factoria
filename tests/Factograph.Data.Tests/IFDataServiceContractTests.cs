@@ -277,6 +277,50 @@ public sealed class IFDataServiceContractTests
     }
 
     [Fact]
+    public void Busy_Factoria_writer_lock_blocks_mutations_before_publishing_Fog()
+    {
+        using var workspace = new ServiceWorkspace();
+        IFDataService service = workspace.Open();
+        string previous = File.ReadAllText(workspace.FogPath);
+        using (var writerLease = new FileStream(workspace.WriterLockPath,
+            FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+        {
+            Exception? failure = Record.Exception(() =>
+                service.PutItem(ServiceWorkspace.OwnedItem(
+                    "busy", "Busy", "BUSYWRITER")));
+            Assert.IsType<IOException>(failure);
+        }
+
+        Assert.Equal(previous, File.ReadAllText(workspace.FogPath));
+        Assert.False(File.Exists(workspace.PendingPath));
+        Assert.False(ServiceWorkspace.ContainsId(
+            service.SearchByWords("BUSYWRITER"), "busy"));
+        service.Close();
+    }
+
+    [Fact]
+    public void Invalid_Fog_during_recovery_keeps_marker_and_retries_after_repair()
+    {
+        using var workspace = new ServiceWorkspace();
+        IFDataService service = workspace.Open();
+        service.Close();
+
+        string original = File.ReadAllText(workspace.FogPath);
+        File.WriteAllText(workspace.FogPath, "<not-well-formed");
+        File.WriteAllText(workspace.PendingPath, "pending");
+
+        Assert.ThrowsAny<Exception>(() => workspace.Open());
+        Assert.True(File.Exists(workspace.PendingPath));
+
+        File.WriteAllText(workspace.FogPath, original);
+        service = workspace.Open();
+        Assert.False(File.Exists(workspace.PendingPath));
+        Assert.True(ServiceWorkspace.ContainsId(
+            service.SearchByWords("ORCHARD"), "alice"));
+        service.Close();
+    }
+
+    [Fact]
     public void Missing_owner_is_rejected_before_persistence()
     {
         using var test = new ServiceWorkspace();
