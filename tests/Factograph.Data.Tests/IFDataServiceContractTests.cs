@@ -244,6 +244,36 @@ public sealed class IFDataServiceContractTests
     }
 
     [Fact]
+    public void Interrupted_Fog_commit_rebuilds_index_from_authoritative_Fog_on_reopen()
+    {
+        using var workspace = new ServiceWorkspace();
+        IFDataService service = workspace.Open();
+        Assert.Null(service.GetItemByIdBasic("recovered", false));
+        service.Close();
+
+        // Simulate a crash after publishing Fog, before the adapter is updated.
+        // Only Factoria-owned files are manipulated, never Polar.DB internals.
+        XElement fog = XElement.Load(workspace.FogPath);
+        fog.Add(ServiceWorkspace.Item("recovered", "Reborn", "PENDINGCOMMIT", "bob"));
+        fog.Save(workspace.FogPath);
+        File.WriteAllText(workspace.PendingPath, "pending");
+
+        service = workspace.Open();
+        Assert.True(ServiceWorkspace.ContainsId(
+            service.SearchByWords("PENDINGCOMMIT"), "recovered"));
+        Assert.NotNull(service.GetItemByIdBasic("recovered", false));
+        Assert.Contains(service.GetItemByIdBasic("bob", true).Elements("inverse"),
+            x => (string?)x.Attribute("prop") == "http://fogid.net/o/knows");
+        Assert.False(File.Exists(workspace.PendingPath));
+        service.Close();
+
+        service = workspace.Open();
+        Assert.True(ServiceWorkspace.ContainsId(
+            service.SearchByWords("PENDINGCOMMIT"), "recovered"));
+        service.Close();
+    }
+
+    [Fact]
     public void Missing_owner_is_rejected_before_persistence()
     {
         using var test = new ServiceWorkspace();
