@@ -64,23 +64,46 @@ should get its own fixture configuration and run the same contract assertions
 where it supports the same contract; unsupported capabilities must be explicitly
 documented, not silently skipped.
 
-## Fault-injection coverage
+## Fault-injection and interrupted-write recovery
 
-The IFDataService suite now verifies:
-- Failed publication of a Fog file does not contaminate the cached XML or a
-  subsequent successful write.
-- A failed Fog publication does not advance the generated identifier counter.
-- A journal path that cannot be opened causes rejection **before** changing
-  Fog or adapter-visible data.
-- Expected accepted operations remain visible in Fog, indexes and journal.
+The IFDataService suite exercises Factoria's public service contract, using
+temporary Fog/config/journal files and no Polar.DB physical-file access.
 
-Fog publication uses a temporary file in the same directory and replacement
-of the destination. This avoids in-place XML truncation. The journal is
-preflight-opened but appended after the index update.
+Verified cases:
+- Failed Fog publication leaves the original document and the cached source
+  intact; a later successful write does not replay the failed change.
+- An unsuccessful publication does not consume the generated Fog ID counter.
+- If the journal is unavailable at open time, the operation fails before
+  changing Fog or the adapter's visible state.
+- Before publishing Fog, Factoria writes and flushes a
+  `.fog-index-pending` intent marker. Once the adapter update and journal
+  append complete, the marker is removed.
+- A service restart with a pending marker rebuilds adapter state from the
+  authoritative Fog source; after success the marker is removed. If the Fog
+  cannot be parsed, startup fails and the marker remains for retry.
+- A second operation in the same service first rebuilds from Fog and invalidates
+  cached XML if a previous operation failed.
+- An exclusive `.fog-writer.lock` handle rejects competing service writes
+  while the first writer is active.
 
-**Still not guaranteed:** atomicity across Fog, adapter and journal under a
-failure **after** Fog publication; mid-append journal I/O errors (e.g. disk
-full); simultaneous writers; forced process termination in each interval;
-filesystem/power-loss durability beyond the file flush; full incremental
-`substitute`; HTTP application tests. Do not interpret the green tests as
-proof of a cross-file transaction.
+Fog publication writes and flushes a temporary file in the destination
+directory before replacing the old Fog. The intent marker is a recovery flag,
+not a distributed transaction. Index rebuilding uses the public adapter API,
+not Polar.DB on-disk internals.
+
+**Remaining limitations and required next tests:**
+- Journal append can still fail after Fog and adapter publication, leaving the
+  journal incomplete. The pending marker repairs derived adapter state, **not**
+  missing journal entries. Decide whether the log is authoritative or merely
+  diagnostic before asserting a three-way atomic commit.
+- A single exclusive writer lease prevents *overlapping* writes but does not
+  guarantee cache coherence across two already-open independent services.
+- No guaranteed atomicity across all files for power loss, directory-entry
+  durability, or cancellation at every instruction boundary.
+- Actual killed-child-process checkpoints between publication stages, full
+  incremental `substitute`, and HTTP application tests are not yet covered.
+- Recovery rebuilds only from valid Fog; it does not attempt to recover
+  corrupted Polar.DB physical files (owned by Polar.DB tests).
+
+Passing this suite therefore establishes recovery for the tested interrupted
+application write scenarios, not an arbitrary crash-proof multi-file transaction.
