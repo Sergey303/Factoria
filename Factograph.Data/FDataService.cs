@@ -78,6 +78,7 @@ namespace Factograph.Data
         public void Init()
         {
             recoveredPendingFog = false;
+            observedFogGeneration = ReadFogGeneration();
             // Создание словаря если есть файл zaliznyak_shortform.zip
             //if (File.Exists(path + "zaliznyak_shortform.zip"))
             if (dictionary != null && File.Exists(dictionary))
@@ -179,8 +180,10 @@ namespace Factograph.Data
                     if (File.Exists(PendingFogCommitPath))
                     {
                         Load();
+                        PublishFogGeneration();
                         File.Delete(PendingFogCommitPath);
                     }
+                    observedFogGeneration = ReadFogGeneration();
                     // Skip adapter recovery: Load already rebuilt the indexes.
                     // Do not return here: log path and other Init state follow.
                     directreload = false;
@@ -326,6 +329,44 @@ namespace Factograph.Data
         private bool recoveredPendingFog;
         private string PendingFogCommitPath => Path.Combine(path, ".fog-index-pending");
         private string FogWriterLockPath => Path.Combine(path, ".fog-writer.lock");
+        private string FogGenerationPath => Path.Combine(path, ".fog-commit-generation");
+        private string observedFogGeneration = "";
+
+        private string ReadFogGeneration() =>
+            File.Exists(FogGenerationPath) ? File.ReadAllText(FogGenerationPath) : "";
+
+        private void PublishFogGeneration()
+        {
+            string temporary = FogGenerationPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                using (var stream = new FileStream(temporary, FileMode.CreateNew,
+                           FileAccess.Write, FileShare.None))
+                using (var writer = new StreamWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true))
+                {
+                    writer.Write(Guid.NewGuid().ToString("N"));
+                    writer.Flush();
+                    stream.Flush(flushToDisk: true);
+                }
+                if (File.Exists(FogGenerationPath))
+                    File.Replace(temporary, FogGenerationPath, null);
+                else
+                    File.Move(temporary, FogGenerationPath);
+            }
+            finally
+            {
+                if (File.Exists(temporary))
+                    File.Delete(temporary);
+            }
+        }
+
+        private void CheckWriterGeneration()
+        {
+            if (ReadFogGeneration() != observedFogGeneration)
+                throw new InvalidOperationException(
+                    "Factoria Fog state changed in another service instance. " +
+                    "Close and reopen this service before writing.");
+        }
 
         private FileStream AcquireFogWriteLease() =>
             new FileStream(FogWriterLockPath,
@@ -338,7 +379,9 @@ namespace Factograph.Data
             // Rebuild from the original Fog sources through the adapter
             // contract. Never interpret or repair Polar.DB physical files.
             Load();
+            PublishFogGeneration();
             File.Delete(PendingFogCommitPath);
+            observedFogGeneration = ReadFogGeneration();
             // A previous adapter update may have failed after Fog publication.
             // Drop every cached source so the next write starts from disk.
             foreach (FogInfo source in fogs)
@@ -837,6 +880,7 @@ namespace Factograph.Data
         {
             ArgumentNullException.ThrowIfNull(item);
             using var writerLease = AcquireFogWriteLease();
+            CheckWriterGeneration();
             return PutItemCore(item);
         }
 
@@ -990,7 +1034,9 @@ namespace Factograph.Data
                 tw.WriteLine(nitem.ToString());
             }
 
+            PublishFogGeneration();
             File.Delete(PendingFogCommitPath);
+            observedFogGeneration = ReadFogGeneration();
             return new XElement(nitem);
         }
 
