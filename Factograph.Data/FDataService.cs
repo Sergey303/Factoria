@@ -329,6 +329,10 @@ namespace Factograph.Data
             // contract. Never interpret or repair Polar.DB physical files.
             Load();
             File.Delete(PendingFogCommitPath);
+            // A previous adapter update may have failed after Fog publication.
+            // Drop every cached source so the next write starts from disk.
+            foreach (FogInfo source in fogs)
+                source.fogx = null;
         }
 
         private void BeginFogCommit()
@@ -847,6 +851,9 @@ namespace Factograph.Data
 
             // Если нет подходящего - запись не производится
             if (fi == null) return new XElement("error", "no writable fog for request");
+
+            // Repair any interrupted prior commit before copying cached Fog.
+            EnsurePendingFogRecovered();
 
             // Если фог не загружен, то загрузить его
             if (fi.fogx == null) fi.fogx = XElement.Load(fi.pth);
