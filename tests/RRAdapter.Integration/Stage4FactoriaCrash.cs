@@ -149,7 +149,7 @@ internal static class Stage4FactoriaCrash
             .Any(x => (string?)x.Attribute("id") == RecordId),
             stage + " full-text search recovered");
         Check(service.GetItemByIdBasic("target", true)?.Elements("inverse")
-            .Any(x => (string?)x.Attribute("prop") == O + "knows") == true,
+            .Any(x => (string?)x.Attribute("prop") == O.NamespaceName + "knows") == true,
             stage + " inverse relation recovered");
         Check(!File.Exists(Pending(path)),
             stage + " recovery intent cleared after successful rebuild");
