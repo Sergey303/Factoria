@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Polar.DB" Version="3.1.1" />
+    <InternalsVisibleTo Include="RRAdapter.Integration" />
   </ItemGroup>
 
 </Project>
