@@ -327,6 +327,10 @@ namespace Factograph.Data
         }
         private string putlogfilename = null;
         private bool recoveredPendingFog;
+        // Only callable by the test harness. Production runs with no checkpoint.
+        internal Action<string>? CommitCheckpointForTests { get; set; }
+        private void CommitCheckpoint(string stage) =>
+            CommitCheckpointForTests?.Invoke(stage);
         private string PendingFogCommitPath => Path.Combine(path, ".fog-index-pending");
         private string FogWriterLockPath => Path.Combine(path, ".fog-writer.lock");
         private string FogGenerationPath => Path.Combine(path, ".fog-commit-generation");
@@ -1029,16 +1033,19 @@ namespace Factograph.Data
             // this point forces a rebuild from Fog before further writes.
             BeginFogCommit();
             SaveFogAtomically(pendingFog, fi.pth);
+            CommitCheckpoint("after-fog");
 
             // Сохраняем в базе данных
             adapter.PutItem(nitem);
             fi.fogx = pendingFog;
+            CommitCheckpoint("after-index");
 
             // Сохраняем в логе
             using (TextWriter tw = new StreamWriter(log, System.Text.Encoding.UTF8))
             {
                 tw.WriteLine(nitem.ToString());
             }
+            CommitCheckpoint("after-journal");
 
             PublishFogGeneration();
             File.Delete(PendingFogCommitPath);
