@@ -21,3 +21,5 @@ jobs:
         run: dotnet build tests/RRAdapter.Integration/RRAdapter.Integration.csproj --configuration Release
       - name: 12000 records and abrupt stop after Flush
         run: dotnet run --project tests/RRAdapter.Integration/RRAdapter.Integration.csproj --configuration Release --no-build -- stage3-all 12000
+      - name: Stage 4 Factoria Fog/index/journal killed-process recovery
+        run: dotnet run --project tests/RRAdapter.Integration/RRAdapter.Integration.csproj --configuration Release --no-build -- stage4-all
