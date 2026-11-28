@@ -129,3 +129,30 @@ replay or journal-reading code in `Factograph.Data`. Its file handle is
 preflight-opened and a failed append can still leave Fog/index committed while
 the diagnostic history lacks an entry. The unresolved contract decision is
 whether this must become a durable audit trail; do not treat it as one yet.
+
+## Stage 4: real killed-process recovery through FDataService
+
+Run separately (or via the scheduled/dispatch extended workflow):
+
+```sh
+dotnet run --project tests/RRAdapter.Integration/RRAdapter.Integration.csproj -c Release -- stage4-all
+```
+
+Three isolated child processes are killed at internal, no-op-in-production
+checkpoints: `after-fog`, `after-index` and `after-journal`. For each,
+the parent reopens `FDataService` and checks the Fog source, pending marker,
+primary key, words, inverse links, journal content at that particular stage,
+marker cleanup, and a second reopen. Each case gets its own uniquely named
+temporary directory. It does not inspect, corrupt, or manipulate Polar.DB
+physical files.
+
+Internal checkpoints are accessible only to the test assembly using
+`InternalsVisibleTo`; production calls incur a null callback. The test
+supervisor kills the child process, not the database engine, and never points
+at real cassette directories.
+
+**Scope limitation:** tests deliberately stop at a known post-stage boundary,
+not at arbitrary bytes of a file write, system power loss, or concurrent
+external writers. A commit published to Fog but killed before journal append
+may be recoverable from Fog while absent from diagnostic `logfile_put.txt`.
+There is no guarantee of durable, complete audit history.
