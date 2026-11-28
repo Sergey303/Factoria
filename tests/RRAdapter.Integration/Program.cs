@@ -1,6 +1,18 @@
 using Factograph.Data.Adapters;
 using System.Xml.Linq;
 
+if (args.Length == 1 && args[0] == "stage4-all")
+{
+    Stage4FactoriaCrash.RunAll();
+    return;
+}
+
+if (args.Length == 3 && args[0] == "stage4-child")
+{
+    Stage4FactoriaCrash.RunChild(args[1], args[2]);
+    return;
+}
+
 if (args.Length == 2 && args[0] == "stage3-all")
 {
     Stage3Runner.RunAll(int.Parse(args[1]));
